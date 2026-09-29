@@ -3,10 +3,8 @@
   "framework": "fastapi",
   "functions": {
     "server.py": {
-      "includeFiles": [
-        "frontend/**",
-        "backend/app/data/**"
-      ],
+      "includeFiles": "{frontend/**,backend/app/**}",
+      "excludeFiles": "{backend/.venv/**,**/__pycache__/**,backend/tests/**,sample_data/**}",
       "maxDuration": 60
     }
   }
