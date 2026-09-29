@@ -147,6 +147,22 @@ network access needed to run them.
 
 ## Deployment for submission
 
+### Vercel (single public URL)
+
+This repository is configured for a single Vercel deployment: it serves the
+dashboard and FastAPI endpoints from the same URL. Import the GitHub repository
+with the **Root Directory** set to `inbox-butler` (or leave it at the repository
+root when this folder is the repository root), then add `GROQ_API_KEY` in the
+Vercel project environment variables. Do not upload `backend/.env`.
+
+- **Framework Preset**: FastAPI
+- **Build Command**: leave Vercel's detected default
+- **Output Directory**: leave blank
+
+Vercel functions use ephemeral storage, so ticket data may reset after a new
+deployment or a cold start. This is suitable for the hackathon demo; use a
+hosted Postgres database for persistent production data.
+
 - **Backend**: Render or Railway both deploy a FastAPI app directly from
   a GitHub repo (or use the included `Dockerfile`). Set `GROQ_API_KEY`
   as an environment variable in the platform's dashboard — never commit it.
