@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Butler — Inbox Triage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0A0D13;
+    --bg-soft: #0F131C;
+    --panel: #141A26;
+    --panel-raised: #1A2233;
+    --line: #262F42;
+    --line-soft: #1D2536;
+    --text: #EDEEF2;
+    --text-dim: #8B93A7;
+    --text-faint: #5C6478;
+
+    --gold: #E8A93D;
+    --gold-dim: #4A3B1E;
+    --gold-glow: rgba(232, 169, 61, 0.16);
+
+    --teal: #33C9A6;
+    --teal-dim: #16352E;
+
+    --coral: #FF6B5E;
+    --coral-dim: #3A1F1D;
+
+    --violet: #9C8CF0;
+    --violet-dim: #26223F;
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    --shadow-lift: 0 8px 28px rgba(0,0,0,0.45);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Manrope', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .serif { font-family: 'Spectral', Georgia, serif; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    position: relative;
+    background: linear-gradient(180deg, #10141D 0%, var(--bg) 100%);
+    padding: 22px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    border-bottom: 1px solid var(--line-soft);
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    top: -60%; left: -10%;
+    width: 420px; height: 420px;
+    background: radial-gradient(circle, var(--gold-glow) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    z-index: 1;
+  }
+  .brand-mark {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--gold) 0%, #C97B2E 100%);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 16px rgba(232,169,61,0.35);
+  }
+  .brand-mark svg { width: 20px; height: 20px; }
+  .brand h1 {
+    font-size: 21px; font-weight: 600; margin: 0;
+    letter-spacing: 0.2px;
+  }
+  .brand .tagline {
+    font-size: 12.5px; color: var(--text-dim);
+    margin-top: 1px;
+  }
+
+  .stat-strip {
+    display: flex;
+    gap: 10px;
+    position: relative;
+    z-index: 1;
+  }
+  .stat-pill {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 8px 16px;
+    min-width: 76px;
+    text-align: center;
+  }
+  .stat-pill .num {
+    font-family: 'Spectral', serif;
+    font-size: 20px; font-weight: 600; line-height: 1.1;
+    color: var(--text);
+  }
+  .stat-pill .lbl {
+    font-size: 10.5px; color: var(--text-faint);
+    margin-top: 2px;
+  }
+  .stat-pill.gold .num { color: var(--gold); }
+  .stat-pill.teal .num { color: var(--teal); }
+  .stat-pill.violet .num { color: var(--violet); }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar {
+    background: var(--bg-soft);
+    border-bottom: 1px solid var(--line-soft);
+    padding: 12px 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .file-chip {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--panel);
+    border: 1px dashed var(--line);
+    border-radius: var(--radius-md);
+    padding: 7px 12px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+  .file-chip input[type=file] {
+    font-size: 12px; color: var(--text-dim);
+    max-width: 190px;
+  }
+  .file-chip input[type=file]::file-selector-button {
+    background: var(--panel-raised);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    margin-right: 8px;
+    cursor: pointer;
+  }
+
+  button {
+    font-family: 'Manrope', inherit;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 9px 18px;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  button.primary {
+    background: linear-gradient(135deg, var(--gold) 0%, #C97B2E 100%);
+    color: #1A1207;
+    box-shadow: 0 4px 14px rgba(232,169,61,0.28);
+  }
+  button.primary:hover:not(:disabled) { box-shadow: 0 6px 18px rgba(232,169,61,0.4); }
+
+  button.secondary {
+    background: var(--panel-raised);
+    color: var(--text);
+    border-color: var(--line);
+  }
+  button.secondary:hover:not(:disabled) { border-color: var(--gold); }
+
+  button.ghost {
+    background: transparent;
+    color: var(--text-faint);
+    border-color: var(--line-soft);
+  }
+  button.ghost:hover:not(:disabled) { color: var(--text-dim); border-color: var(--line); }
+
+  button.approve {
+    background: var(--teal-dim);
+    color: var(--teal);
+    border-color: rgba(51,201,166,0.35);
+  }
+  button.approve:hover:not(:disabled) { background: rgba(51,201,166,0.22); }
+
+  button.reject {
+    background: var(--coral-dim);
+    color: var(--coral);
+    border-color: rgba(255,107,94,0.35);
+  }
+  button.reject:hover:not(:disabled) { background: rgba(255,107,94,0.22); }
+
+  .api-field {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11.5px; color: var(--text-faint);
+  }
+  .api-field input {
+    font-size: 12px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--panel);
+    color: var(--text-dim);
+    width: 210px;
+    font-family: 'Manrope', monospace;
+  }
+  .api-field input:focus { outline: 1px solid var(--gold); }
+
+  /* ---------- Filter bar ---------- */
+  .filter-bar {
+    background: var(--bg-soft);
+    border-bottom: 1px solid var(--line-soft);
+    padding: 10px 32px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .filter-bar input[type=search] {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 7px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--text);
+    width: 200px;
+  }
+  .filter-bar input[type=search]:focus { outline: 1px solid var(--gold); }
+  .filter-bar select {
+    font-family: inherit;
+    font-size: 12.5px;
+    padding: 7px 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--text-dim);
+  }
+  .chip-toggle {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 13px;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--text-faint);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.12s ease;
+  }
+  .chip-toggle:hover { border-color: var(--text-dim); }
+  .chip-toggle.on {
+    background: var(--gold-dim);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+  .filter-count {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-left: 4px;
+  }
+  .kbd-hint {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-faint);
+    display: flex;
+    gap: 12px;
+  }
+  .kbd-hint kbd {
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: inherit;
+    font-size: 10.5px;
+    color: var(--text-dim);
+  }
+
+  /* ---------- Insights panel ---------- */
+  .insights-panel {
+    display: none;
+    background: var(--bg-soft);
+    border-bottom: 1px solid var(--line-soft);
+    padding: 20px 32px 22px;
+  }
+  .insights-panel.open { display: block; }
+  .insights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+  }
+  .insight-card {
+    background: var(--panel);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
+  }
+  .insight-card h3 {
+    font-family: 'Spectral', serif;
+    font-size: 14px; font-weight: 600;
+    margin: 0 0 12px 0;
+    color: var(--text-dim);
+  }
+  .insight-bar-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px; font-size: 12px;
+  }
+  .insight-bar-row .bar-label {
+    width: 90px; flex-shrink: 0; color: var(--text-dim);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .insight-bar-track {
+    flex: 1; height: 8px; border-radius: 5px;
+    background: var(--panel-raised); overflow: hidden;
+  }
+  .insight-bar-fill { height: 100%; border-radius: 5px; }
+  .insight-bar-row .bar-value {
+    width: 24px; text-align: right; color: var(--text-faint); flex-shrink: 0;
+  }
+  .insight-stat-row {
+    display: flex; justify-content: space-between;
+    font-size: 13px; padding: 6px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .insight-stat-row:last-child { border-bottom: none; }
+  .insight-stat-row .v { font-weight: 700; }
+  .insight-stat-row .v.warn { color: var(--coral); }
+  .insight-stat-row .v.ok { color: var(--teal); }
+
+  /* ---------- SLA & review badges ---------- */
+  .badge.sla-breach { background: var(--coral-dim); color: var(--coral); }
+  .badge.sla-risk { background: var(--gold-dim); color: var(--gold); }
+  .badge.review { background: var(--violet-dim); color: var(--violet); }
+  .badge-lg.sla-breach { background: var(--coral-dim); color: var(--coral); }
+  .badge-lg.sla-risk { background: var(--gold-dim); color: var(--gold); }
+  .badge-lg.review { background: var(--violet-dim); color: var(--violet); }
+
+  .cluster-actions {
+    margin-top: 10px;
+  }
+  button.cluster-resolve {
+    background: var(--violet-dim);
+    color: var(--violet);
+    border-color: rgba(156,140,240,0.35);
+    font-size: 12px;
+    padding: 7px 14px;
+  }
+  button.cluster-resolve:hover:not(:disabled) { background: rgba(156,140,240,0.22); }
+
+  /* ---------- Pipeline progress ---------- */
+  .pipeline-strip {
+    display: none;
+    background: var(--bg-soft);
+    border-bottom: 1px solid var(--line-soft);
+    padding: 14px 32px;
+    gap: 6px;
+    align-items: center;
+  }
+  .pipeline-strip.active { display: flex; }
+  .pipeline-steps {
+    display: flex; align-items: center; gap: 0;
+    flex-wrap: wrap;
+  }
+  .pipeline-step {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 12px; color: var(--text-faint);
+    padding: 5px 12px 5px 4px;
+    position: relative;
+  }
+  .pipeline-step .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--line);
+    transition: background 0.25s ease, box-shadow 0.25s ease;
+    flex-shrink: 0;
+  }
+  .pipeline-step.done .dot { background: var(--teal); }
+  .pipeline-step.active .dot {
+    background: var(--gold);
+    box-shadow: 0 0 0 4px var(--gold-glow);
+    animation: pulse 1s ease-in-out infinite;
+  }
+  .pipeline-step.active span { color: var(--text); font-weight: 600; }
+  .pipeline-step.done span { color: var(--text-dim); }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 4px var(--gold-glow); }
+    50% { box-shadow: 0 0 0 7px transparent; }
+  }
+  .pipeline-connector {
+    width: 20px; height: 1px; background: var(--line);
+  }
+
+  /* ---------- Main layout ---------- */
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(320px, 400px) 1fr;
+    min-height: 0;
+  }
+  @media (max-width: 860px) {
+    main { grid-template-columns: 1fr; }
+    .detail { border-left: none !important; border-top: 1px solid var(--line-soft); }
+  }
+
+  .queue {
+    overflow-y: auto;
+    border-right: 1px solid var(--line-soft);
+    background: var(--bg-soft);
+    padding: 10px;
+  }
+  .empty-state {
+    padding: 60px 26px;
+    text-align: center;
+    color: var(--text-dim);
+  }
+  .empty-state svg { opacity: 0.5; margin-bottom: 14px; }
+  .empty-state .headline {
+    font-family: 'Spectral', serif;
+    font-size: 17px; color: var(--text);
+    margin-bottom: 6px;
+  }
+  .empty-state .sub { font-size: 13px; line-height: 1.6; max-width: 260px; margin: 0 auto; }
+
+  .ticket-card {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-md);
+    padding: 13px 14px 13px 16px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    transition: border-color 0.15s ease, transform 0.12s ease, background 0.15s ease;
+  }
+  .ticket-card:hover { border-color: var(--line); transform: translateX(2px); }
+  .ticket-card.active {
+    background: var(--panel-raised);
+    border-color: var(--gold);
+  }
+  .ticket-card::before {
+    content: '';
+    position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
+    border-radius: 3px;
+  }
+  .ticket-card.high::before { background: var(--coral); }
+  .ticket-card.medium::before { background: var(--gold); }
+  .ticket-card.low::before { background: var(--teal); }
+
+  .rank-badge {
+    font-family: 'Spectral', serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-faint);
+    width: 20px;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+
+  .avatar {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11.5px; font-weight: 700;
+    color: #0A0D13;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .card-meta { flex: 1; min-width: 0; }
+  .card-meta .subject {
+    font-weight: 700; font-size: 13.5px;
+    color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .card-meta .sender {
+    font-size: 12px; color: var(--text-faint);
+    margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .badge-row {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .badge {
+    font-size: 10px; font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    line-height: 1.6;
+  }
+  .badge.vip { background: var(--gold-dim); color: var(--gold); }
+  .badge.cluster { background: var(--violet-dim); color: var(--violet); }
+  .badge.approved { background: var(--teal-dim); color: var(--teal); }
+  .badge.rejected { background: var(--coral-dim); color: var(--coral); }
+
+  /* ---------- Detail pane ---------- */
+  .detail {
+    overflow-y: auto;
+    padding: 36px 44px 60px;
+  }
+  .detail-empty {
+    height: 100%;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .detail-head { margin-bottom: 22px; }
+  .detail-head .subject-line {
+    font-family: 'Spectral', serif;
+    font-size: 26px; font-weight: 600;
+    margin: 0 0 6px 0;
+    color: var(--text);
+  }
+  .detail-head .from-line {
+    color: var(--text-dim); font-size: 13.5px;
+  }
+
+  .badges-lg { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 24px; }
+  .badge-lg {
+    font-size: 11.5px; font-weight: 700;
+    padding: 6px 13px;
+    border-radius: 20px;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .badge-lg.neutral { background: var(--panel-raised); color: var(--text-dim); border: 1px solid var(--line); }
+  .badge-lg.vip { background: var(--gold-dim); color: var(--gold); }
+  .badge-lg.urgent { background: var(--coral-dim); color: var(--coral); }
+  .badge-lg.calm { background: var(--teal-dim); color: var(--teal); }
+
+  .priority-gauge {
+    margin-bottom: 24px;
+  }
+  .priority-gauge .row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+  .priority-gauge .label { font-size: 12px; font-weight: 700; color: var(--text-faint); }
+  .priority-gauge .score { font-family: 'Spectral', serif; font-size: 16px; font-weight: 600; }
+  .gauge-track {
+    height: 7px; border-radius: 6px;
+    background: var(--panel-raised);
+    overflow: hidden;
+  }
+  .gauge-fill {
+    height: 100%; border-radius: 6px;
+    transition: width 0.4s ease;
+  }
+
+  .cluster-note {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 13px;
+    color: var(--violet);
+    background: var(--violet-dim);
+    border: 1px solid rgba(156,140,240,0.3);
+    border-radius: var(--radius-md);
+    padding: 11px 15px;
+    margin-bottom: 22px;
+  }
+
+  .section-label {
+    font-size: 11.5px;
+    font-weight: 800;
+    text-transform: none;
+    color: var(--text-faint);
+    margin-bottom: 9px;
+  }
+
+  .body-block {
+    background: var(--panel);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-md);
+    padding: 18px 20px;
+    font-size: 14px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    color: var(--text-dim);
+    margin-bottom: 28px;
+  }
+
+  .draft-panel {
+    background: var(--panel);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-md);
+    padding: 4px;
+    margin-bottom: 8px;
+  }
+  textarea.draft {
+    width: 100%;
+    min-height: 160px;
+    font-family: 'Manrope', inherit;
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 16px 18px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text);
+    resize: vertical;
+  }
+  textarea.draft:focus { outline: none; }
+  textarea.draft[readonly] { color: var(--text-dim); }
+
+  .decision-bar {
+    margin-top: 18px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .decision-note { font-size: 12.5px; color: var(--text-faint); }
+  .decision-note.final { color: var(--text); font-weight: 600; display: flex; align-items: center; gap: 7px; }
+
+  /* ---------- Toasts ---------- */
+  #toasts {
+    position: fixed; bottom: 22px; right: 22px;
+    display: flex; flex-direction: column; gap: 10px;
+    z-index: 999;
+  }
+  .toast {
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 13px 18px;
+    font-size: 13px;
+    color: var(--text);
+    box-shadow: var(--shadow-lift);
+    min-width: 240px;
+    max-width: 340px;
+    animation: toast-in 0.25s ease;
+  }
+  .toast.error { border-color: rgba(255,107,94,0.4); }
+  .toast.success { border-color: rgba(51,201,166,0.4); }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 7L12 13L21 7" stroke="#1A1207" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="3" y="5" width="18" height="14" rx="2" stroke="#1A1207" stroke-width="2"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="serif">The Butler</h1>
+        <div class="tagline">Triage, prioritize, and draft — you approve the send</div>
+      </div>
+    </div>
+    <div class="stat-strip" id="stats"></div>
+  </header>
+
+  <div class="toolbar">
+    <label class="file-chip">
+      📎 <input type="file" id="fileInput" accept=".csv,.json">
+    </label>
+    <button class="secondary" id="uploadBtn">Upload export</button>
+    <button class="primary" id="runBtn">Run triage pipeline</button>
+    <button class="ghost" id="insightsBtn">📊 Insights</button>
+    <button class="ghost" id="exportBtn">⬇ Export decisions</button>
+    <button class="ghost" id="resetBtn">Reset</button>
+    <div class="api-field">
+      <span>API</span>
+      <input type="text" id="apiBase" value="">
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <input type="search" id="searchInput" placeholder="Search subject, body, sender…">
+    <select id="categoryFilter">
+      <option value="">All categories</option>
+      <option value="billing">Billing</option>
+      <option value="bug">Bug</option>
+      <option value="complaint">Complaint</option>
+      <option value="feature_request">Feature request</option>
+      <option value="account_access">Account access</option>
+      <option value="question">Question</option>
+      <option value="praise">Praise</option>
+      <option value="other">Other</option>
+    </select>
+    <div class="chip-toggle" id="chipVip" data-filter="vip">★ VIP only</div>
+    <div class="chip-toggle" id="chipReview" data-filter="review">🔎 Needs review</div>
+    <div class="chip-toggle" id="chipSla" data-filter="sla">⏰ SLA at risk</div>
+    <span class="filter-count" id="filterCount"></span>
+    <div class="kbd-hint">
+      <span><kbd>j</kbd>/<kbd>k</kbd> navigate</span>
+      <span><kbd>a</kbd> approve</span>
+      <span><kbd>r</kbd> reject</span>
+      <span><kbd>/</kbd> search</span>
+    </div>
+  </div>
+
+  <div class="insights-panel" id="insightsPanel"></div>
+
+  <div class="pipeline-strip" id="pipelineStrip">
+    <div class="pipeline-steps" id="pipelineSteps"></div>
+  </div>
+
+  <main>
+    <div class="queue" id="queue"></div>
+    <div class="detail" id="detail"></div>
+  </main>
+
+</div>
+
+<div id="toasts"></div>
+
+<script>
+// When served by FastAPI this automatically uses the current backend. The
+// field remains available for a separately deployed API.
+const API_PLACEHOLDER = window.location.origin || 'http://localhost:8000';
+const state = { tickets: [], selectedId: null };
+const PIPELINE_STAGES = ['Classifying', 'Embedding', 'Clustering', 'Prioritizing', 'Drafting replies'];
+
+const el = {
+  apiBase: document.getElementById('apiBase'),
+  fileInput: document.getElementById('fileInput'),
+  uploadBtn: document.getElementById('uploadBtn'),
+  runBtn: document.getElementById('runBtn'),
+  resetBtn: document.getElementById('resetBtn'),
+  queue: document.getElementById('queue'),
+  detail: document.getElementById('detail'),
+  stats: document.getElementById('stats'),
+  pipelineStrip: document.getElementById('pipelineStrip'),
+  pipelineSteps: document.getElementById('pipelineSteps'),
+  toasts: document.getElementById('toasts'),
+  insightsBtn: document.getElementById('insightsBtn'),
+  exportBtn: document.getElementById('exportBtn'),
+  insightsPanel: document.getElementById('insightsPanel'),
+  searchInput: document.getElementById('searchInput'),
+  categoryFilter: document.getElementById('categoryFilter'),
+  chipVip: document.getElementById('chipVip'),
+  chipReview: document.getElementById('chipReview'),
+  chipSla: document.getElementById('chipSla'),
+  filterCount: document.getElementById('filterCount'),
+};
+
+const filters = { search: '', category: '', vip: false, review: false, sla: false };
+
+try {
+  const saved = localStorage.getItem('butler_api_base');
+  if (saved) el.apiBase.value = saved;
+} catch (e) { /* storage unavailable - fine, default stays */ }
+el.apiBase.addEventListener('change', () => {
+  try { localStorage.setItem('butler_api_base', el.apiBase.value); } catch (e) {}
+});
+
+function apiUrl(path) {
+  return (el.apiBase.value || API_PLACEHOLDER).replace(/\/$/, '') + path;
+}
+
+function toast(message, kind) {
+  const t = document.createElement('div');
+  t.className = 'toast' + (kind ? ' ' + kind : '');
+  t.textContent = message;
+  el.toasts.appendChild(t);
+  setTimeout(() => { t.style.transition = 'opacity 0.3s ease'; t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3800);
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = (str === null || str === undefined) ? '' : str;
+  return d.innerHTML;
+}
+
+function initials(name, email) {
+  const src = (name && name.trim()) || email || '?';
+  const parts = src.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return src.slice(0, 2).toUpperCase();
+}
+
+function avatarColor(seed) {
+  const colors = ['#E8A93D', '#33C9A6', '#9C8CF0', '#FF6B5E', '#5EA8FF', '#F0C23D'];
+  let hash = 0;
+  for (const ch of String(seed)) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return colors[hash % colors.length];
+}
+
+function priorityClass(score) {
+  if (score === null || score === undefined) return 'low';
+  if (score >= 0.6) return 'high';
+  if (score >= 0.35) return 'medium';
+  return 'low';
+}
+
+function priorityColor(score) {
+  const c = priorityClass(score);
+  return c === 'high' ? 'var(--coral)' : c === 'medium' ? 'var(--gold)' : 'var(--teal)';
+}
+
+/* ---------- Pipeline progress animation ---------- */
+let pipelineInterval = null;
+
+function startPipelineAnimation() {
+  el.pipelineStrip.classList.add('active');
+  el.pipelineSteps.innerHTML = PIPELINE_STAGES.map((s, i) => `
+    <div class="pipeline-step" data-i="${i}"><div class="dot"></div><span>${s}</span></div>
+    ${i < PIPELINE_STAGES.length - 1 ? '<div class="pipeline-connector"></div>' : ''}
+  `).join('');
+  let current = 0;
+  const steps = () => el.pipelineSteps.querySelectorAll('.pipeline-step');
+  const advance = () => {
+    steps().forEach((s, i) => {
+      s.classList.toggle('done', i < current);
+      s.classList.toggle('active', i === current);
+    });
+    current = Math.min(current + 1, PIPELINE_STAGES.length);
+  };
+  advance();
+  pipelineInterval = setInterval(advance, 1100);
+}
+
+function finishPipelineAnimation() {
+  if (pipelineInterval) clearInterval(pipelineInterval);
+  el.pipelineSteps.querySelectorAll('.pipeline-step').forEach(s => {
+    s.classList.add('done'); s.classList.remove('active');
+  });
+  setTimeout(() => el.pipelineStrip.classList.remove('active'), 500);
+}
+
+/* ---------- Data ---------- */
+async function fetchTickets() {
+  try {
+    const res = await fetch(apiUrl('/tickets'));
+    if (!res.ok) throw new Error(await res.text());
+    state.tickets = await res.json();
+    renderQueue();
+    renderStats();
+    if (state.selectedId) renderDetail();
+  } catch (err) {
+    el.queue.innerHTML = emptyState('🔌', "Can't reach the API", `Check the API address in the toolbar. (${escapeHtml(err.message || String(err))})`);
+    el.detail.innerHTML = '';
+  }
+}
+
+function renderStats() {
+  const total = state.tickets.length;
+  const pending = state.tickets.filter(t => t.status === 'triaged').length;
+  const approved = state.tickets.filter(t => t.status === 'approved').length;
+  const clusters = new Set(state.tickets.map(t => t.cluster_id).filter(c => c !== null && c !== undefined && (state.tickets.find(x=>x.cluster_id===c)))).size;
+  el.stats.innerHTML = total ? `
+    <div class="stat-pill"><div class="num serif">${total}</div><div class="lbl">Total</div></div>
+    <div class="stat-pill gold"><div class="num serif">${pending}</div><div class="lbl">Pending</div></div>
+    <div class="stat-pill teal"><div class="num serif">${approved}</div><div class="lbl">Approved</div></div>
+    <div class="stat-pill violet"><div class="num serif">${clusters}</div><div class="lbl">Clusters</div></div>
+  ` : '';
+}
+
+function emptyState(icon, headline, sub) {
+  return `<div class="empty-state">
+    <div style="font-size:34px;">${icon}</div>
+    <div class="headline serif">${headline}</div>
+    <div class="sub">${sub}</div>
+  </div>`;
+}
+
+function applyFilters(tickets) {
+  return tickets.filter(t => {
+    if (filters.category && t.category !== filters.category) return false;
+    if (filters.vip && !t.is_vip) return false;
+    if (filters.review && !t.needs_review) return false;
+    if (filters.sla && !(t.sla_breached || t.sla_risk >= 0.75)) return false;
+    if (filters.search) {
+      const haystack = `${t.subject} ${t.body} ${t.sender_name || ''} ${t.sender_email}`.toLowerCase();
+      if (!haystack.includes(filters.search.toLowerCase())) return false;
+    }
+    return true;
+  });
+}
+
+function slaBadge(t, size) {
+  const cls = size === 'lg' ? 'badge-lg' : 'badge';
+  if (t.sla_breached) return `<span class="${cls} sla-breach">⏰ SLA breached</span>`;
+  if (t.sla_risk >= 0.75) return `<span class="${cls} sla-risk">⏰ ${t.sla_hours_remaining}h left</span>`;
+  return '';
+}
+
+function renderQueue() {
+  if (!state.tickets.length) {
+    el.queue.innerHTML = emptyState('📭', 'Inbox is empty', 'Upload a CSV or JSON export above, then run the triage pipeline to fill this queue.');
+    el.detail.innerHTML = emptyState('👆', 'Nothing selected', 'Pick a ticket from the queue once it\'s loaded.');
+    el.filterCount.textContent = '';
+    return;
+  }
+
+  const filtered = applyFilters(state.tickets);
+  const sorted = [...filtered].sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0));
+
+  const anyFilterActive = filters.search || filters.category || filters.vip || filters.review || filters.sla;
+  el.filterCount.textContent = anyFilterActive ? `${sorted.length} of ${state.tickets.length} shown` : '';
+
+  if (!sorted.length) {
+    el.queue.innerHTML = emptyState('🔍', 'No matches', 'Nothing in the queue matches these filters.');
+    return;
+  }
+
+  el.queue.innerHTML = sorted.map((t, i) => `
+    <div class="ticket-card ${priorityClass(t.priority_score)} ${t.id === state.selectedId ? 'active' : ''}" data-id="${t.id}">
+      <div class="rank-badge serif">#${i + 1}</div>
+      <div class="avatar" style="background:${avatarColor(t.sender_email)}">${initials(t.sender_name, t.sender_email)}</div>
+      <div class="card-meta">
+        <div class="subject">${escapeHtml(t.subject)}</div>
+        <div class="sender">${escapeHtml(t.sender_name || t.sender_email)}</div>
+        <div class="badge-row">
+          ${t.is_vip ? '<span class="badge vip">VIP</span>' : ''}
+          ${t.cluster_size > 1 ? `<span class="badge cluster">×${t.cluster_size} similar</span>` : ''}
+          ${t.needs_review ? '<span class="badge review">🔎 review</span>' : ''}
+          ${slaBadge(t, 'sm')}
+          ${t.status === 'approved' ? '<span class="badge approved">Approved</span>' : ''}
+          ${t.status === 'rejected' ? '<span class="badge rejected">Rejected</span>' : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  el.queue.querySelectorAll('.ticket-card').forEach(card => {
+    card.addEventListener('click', () => {
+      state.selectedId = parseInt(card.dataset.id, 10);
+      renderQueue();
+      renderDetail();
+    });
+  });
+
+  if ((!state.selectedId || !sorted.find(t => t.id === state.selectedId)) && sorted.length) {
+    state.selectedId = sorted[0].id;
+    renderQueue();
+    renderDetail();
+  }
+}
+
+function currentFilteredSorted() {
+  const filtered = applyFilters(state.tickets);
+  return [...filtered].sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0));
+}
+
+function renderDetail() {
+  const ticket = state.tickets.find(t => t.id === state.selectedId);
+  if (!ticket) {
+    el.detail.innerHTML = emptyState('👆', 'Nothing selected', 'Pick a ticket from the queue.');
+    return;
+  }
+
+  const decided = ticket.status === 'approved' || ticket.status === 'rejected';
+  const pct = Math.round((ticket.priority_score || 0) * 100);
+
+  el.detail.innerHTML = `
+    <div class="detail-head">
+      <h2 class="subject-line">${escapeHtml(ticket.subject)}</h2>
+      <div class="from-line">${escapeHtml(ticket.sender_name || '')} &lt;${escapeHtml(ticket.sender_email)}&gt;</div>
+    </div>
+
+    <div class="priority-gauge">
+      <div class="row">
+        <span class="label">Priority score</span>
+        <span class="score serif" style="color:${priorityColor(ticket.priority_score)}">${ticket.priority_score !== null ? ticket.priority_score.toFixed(2) : '—'}</span>
+      </div>
+      <div class="gauge-track"><div class="gauge-fill" style="width:${pct}%; background:${priorityColor(ticket.priority_score)}"></div></div>
+    </div>
+
+    <div class="badges-lg">
+      ${ticket.is_vip ? '<span class="badge-lg vip">★ VIP sender</span>' : ''}
+      ${ticket.category ? `<span class="badge-lg neutral">${escapeHtml(ticket.category.replace('_',' '))}</span>` : ''}
+      ${ticket.urgency ? `<span class="badge-lg ${ticket.urgency >= 4 ? 'urgent' : 'neutral'}">urgency ${ticket.urgency}/5</span>` : ''}
+      ${ticket.sentiment ? `<span class="badge-lg ${ticket.sentiment === 'negative' ? 'urgent' : ticket.sentiment === 'positive' ? 'calm' : 'neutral'}">${escapeHtml(ticket.sentiment)}</span>` : ''}
+      ${ticket.action_type ? `<span class="badge-lg neutral">→ ${escapeHtml(ticket.action_type.replace(/_/g,' '))}</span>` : ''}
+      ${ticket.needs_review ? `<span class="badge-lg review">🔎 low-confidence — double-check</span>` : ''}
+      ${slaBadge(ticket, 'lg')}
+    </div>
+
+    ${ticket.cluster_size > 1 ? `
+      <div class="cluster-note">
+        <span>🔗 Grouped with ${ticket.cluster_size - 1} other similar report${ticket.cluster_size - 1 > 1 ? 's' : ''} — likely the same underlying issue.</span>
+      </div>
+      ${!decided ? `<div class="cluster-actions">
+        <button class="cluster-resolve" id="resolveClusterBtn">✓ Approve this reply for all ${ticket.cluster_size} similar tickets</button>
+      </div>` : ''}
+    ` : ''}
+
+    <div class="section-label">Original message</div>
+    <div class="body-block">${escapeHtml(ticket.body)}</div>
+
+    <div class="section-label">Drafted reply ${decided ? '' : '— edit before approving if needed'}</div>
+    <div class="draft-panel">
+      <textarea class="draft" id="draftText" ${decided ? 'readonly' : ''}>${escapeHtml(ticket.final_reply || ticket.draft_reply || '')}</textarea>
+    </div>
+
+    <div class="decision-bar">
+      ${decided
+        ? `<span class="decision-note final">${ticket.status === 'approved' ? '✅' : '✕'} This ticket was ${ticket.status}.</span>`
+        : `<button class="approve" id="approveBtn">✓ Approve &amp; send</button>
+           <button class="reject" id="rejectBtn">✕ Reject</button>
+           <span class="decision-note">Nothing is sent externally — this records the decision.</span>`
+      }
+    </div>
+  `;
+
+  if (!decided) {
+    document.getElementById('approveBtn').addEventListener('click', () => decide(ticket.id, 'approved'));
+    document.getElementById('rejectBtn').addEventListener('click', () => decide(ticket.id, 'rejected'));
+    const clusterBtn = document.getElementById('resolveClusterBtn');
+    if (clusterBtn) clusterBtn.addEventListener('click', () => resolveCluster(ticket));
+  }
+}
+
+async function resolveCluster(ticket) {
+  const draftEl = document.getElementById('draftText');
+  const finalReply = draftEl ? draftEl.value : undefined;
+  if (!confirm(`Approve this reply for all ${ticket.cluster_size} tickets in this group?`)) return;
+  try {
+    const res = await fetch(apiUrl(`/tickets/cluster/${ticket.cluster_id}/resolve`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'approved', final_reply: finalReply }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const updatedList = await res.json();
+    updatedList.forEach(u => {
+      const idx = state.tickets.findIndex(t => t.id === u.id);
+      if (idx !== -1) state.tickets[idx] = u;
+    });
+    renderQueue();
+    renderDetail();
+    renderStats();
+    toast(`Approved ${updatedList.length} tickets in this group.`, 'success');
+  } catch (err) {
+    toast('Could not resolve cluster: ' + (err.message || err), 'error');
+  }
+}
+
+async function decide(ticketId, status) {
+  const draftEl = document.getElementById('draftText');
+  const finalReply = draftEl ? draftEl.value : undefined;
+  try {
+    const res = await fetch(apiUrl(`/tickets/${ticketId}/decision`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, final_reply: finalReply }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const updated = await res.json();
+    const idx = state.tickets.findIndex(t => t.id === updated.id);
+    if (idx !== -1) state.tickets[idx] = updated;
+    renderQueue();
+    renderDetail();
+    renderStats();
+    if (insightsOpen) fetchAndRenderInsights();
+    toast(status === 'approved' ? 'Reply approved.' : 'Ticket rejected.', status === 'approved' ? 'success' : '');
+  } catch (err) {
+    toast('Could not record decision: ' + (err.message || err), 'error');
+  }
+}
+
+/* ---------- Insights panel ---------- */
+let insightsOpen = false;
+
+function insightBar(label, count, total, color) {
+  const pct = total ? Math.round((count / total) * 100) : 0;
+  return `
+    <div class="insight-bar-row">
+      <span class="bar-label">${escapeHtml(label.replace(/_/g,' '))}</span>
+      <div class="insight-bar-track"><div class="insight-bar-fill" style="width:${pct}%; background:${color}"></div></div>
+      <span class="bar-value">${count}</span>
+    </div>`;
+}
+
+async function fetchAndRenderInsights() {
+  try {
+    const res = await fetch(apiUrl('/insights'));
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+
+    const catColors = ['#E8A93D', '#33C9A6', '#9C8CF0', '#FF6B5E', '#5EA8FF', '#F0C23D', '#7DD3C0', '#C97B2E'];
+    const catEntries = Object.entries(data.by_category).sort((a, b) => b[1] - a[1]);
+    const catBars = catEntries.map(([k, v], i) => insightBar(k, v, data.total, catColors[i % catColors.length])).join('');
+
+    const sentColors = { positive: 'var(--teal)', neutral: 'var(--text-faint)', negative: 'var(--coral)' };
+    const sentBars = Object.entries(data.by_sentiment).map(([k, v]) => insightBar(k, v, data.total, sentColors[k] || 'var(--text-faint)')).join('');
+
+    el.insightsPanel.innerHTML = `
+      <div class="insights-grid">
+        <div class="insight-card">
+          <h3>By category</h3>
+          ${catBars || '<span style="color:var(--text-faint); font-size:12px;">No data yet</span>'}
+        </div>
+        <div class="insight-card">
+          <h3>By sentiment</h3>
+          ${sentBars || '<span style="color:var(--text-faint); font-size:12px;">No data yet</span>'}
+        </div>
+        <div class="insight-card">
+          <h3>Health check</h3>
+          <div class="insight-stat-row"><span>Total tickets</span><span class="v">${data.total}</span></div>
+          <div class="insight-stat-row"><span>Needs human review</span><span class="v ${data.needs_review_count ? 'warn' : ''}">${data.needs_review_count}</span></div>
+          <div class="insight-stat-row"><span>SLA breached</span><span class="v ${data.sla_breached_count ? 'warn' : 'ok'}">${data.sla_breached_count}</span></div>
+          <div class="insight-stat-row"><span>SLA at risk</span><span class="v ${data.sla_at_risk_count ? 'warn' : 'ok'}">${data.sla_at_risk_count}</span></div>
+          <div class="insight-stat-row"><span>Issue clusters</span><span class="v">${data.cluster_count}</span></div>
+          <div class="insight-stat-row"><span>Avg. priority</span><span class="v">${data.avg_priority !== null ? data.avg_priority.toFixed(2) : '—'}</span></div>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    el.insightsPanel.innerHTML = `<span style="color:var(--text-faint); font-size:13px;">Couldn't load insights: ${escapeHtml(err.message || String(err))}</span>`;
+  }
+}
+
+el.insightsBtn.addEventListener('click', () => {
+  insightsOpen = !insightsOpen;
+  el.insightsPanel.classList.toggle('open', insightsOpen);
+  el.insightsBtn.classList.toggle('secondary', insightsOpen);
+  if (insightsOpen) fetchAndRenderInsights();
+});
+
+el.exportBtn.addEventListener('click', () => {
+  window.open(apiUrl('/export/decisions.csv'), '_blank');
+});
+
+/* ---------- Filters ---------- */
+let searchDebounce = null;
+el.searchInput.addEventListener('input', () => {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => {
+    filters.search = el.searchInput.value.trim();
+    renderQueue();
+  }, 200);
+});
+
+el.categoryFilter.addEventListener('change', () => {
+  filters.category = el.categoryFilter.value;
+  renderQueue();
+});
+
+function wireChip(chipEl, key) {
+  chipEl.addEventListener('click', () => {
+    filters[key] = !filters[key];
+    chipEl.classList.toggle('on', filters[key]);
+    renderQueue();
+  });
+}
+wireChip(el.chipVip, 'vip');
+wireChip(el.chipReview, 'review');
+wireChip(el.chipSla, 'sla');
+
+/* ---------- Keyboard shortcuts ---------- */
+document.addEventListener('keydown', (e) => {
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+  if (e.key === '/' && !typing) {
+    e.preventDefault();
+    el.searchInput.focus();
+    return;
+  }
+  if (typing) return; // don't hijack normal typing, including inside the draft textarea
+
+  const list = currentFilteredSorted();
+  if (!list.length) return;
+  const idx = list.findIndex(t => t.id === state.selectedId);
+
+  if (e.key === 'j') {
+    e.preventDefault();
+    const next = list[Math.min(idx + 1, list.length - 1)] || list[0];
+    state.selectedId = next.id;
+    renderQueue(); renderDetail();
+  } else if (e.key === 'k') {
+    e.preventDefault();
+    const prev = list[Math.max(idx - 1, 0)] || list[0];
+    state.selectedId = prev.id;
+    renderQueue(); renderDetail();
+  } else if (e.key === 'a') {
+    const current = list[idx];
+    if (current && current.status !== 'approved' && current.status !== 'rejected') decide(current.id, 'approved');
+  } else if (e.key === 'r') {
+    const current = list[idx];
+    if (current && current.status !== 'approved' && current.status !== 'rejected') decide(current.id, 'rejected');
+  }
+});
+
+el.uploadBtn.addEventListener('click', async () => {
+  const file = el.fileInput.files[0];
+  if (!file) { toast('Choose a CSV or JSON file first.', 'error'); return; }
+  const formData = new FormData();
+  formData.append('file', file);
+  el.uploadBtn.disabled = true;
+  try {
+    const res = await fetch(apiUrl('/upload'), { method: 'POST', body: formData });
+    if (!res.ok) throw new Error(await res.text());
+    const result = await res.json();
+    await fetchTickets();
+    toast(`Ingested ${result.ingested} tickets. Now run the pipeline.`, 'success');
+  } catch (err) {
+    toast('Upload failed: ' + (err.message || err), 'error');
+  } finally {
+    el.uploadBtn.disabled = false;
+  }
+});
+
+el.runBtn.addEventListener('click', async () => {
+  el.runBtn.disabled = true;
+  startPipelineAnimation();
+  try {
+    const res = await fetch(apiUrl('/pipeline/run'), { method: 'POST' });
+    if (!res.ok) throw new Error(await res.text());
+    const result = await res.json();
+    finishPipelineAnimation();
+    await fetchTickets();
+    if (result.total === 0) toast('No new tickets to process — upload an export first.', '');
+    else toast(`Triaged ${result.total} tickets.`, 'success');
+  } catch (err) {
+    finishPipelineAnimation();
+    toast('Pipeline run failed: ' + (err.message || err), 'error');
+  } finally {
+    el.runBtn.disabled = false;
+  }
+});
+
+el.resetBtn.addEventListener('click', async () => {
+  if (!confirm('This clears all tickets on the server. Continue?')) return;
+  try {
+    await fetch(apiUrl('/reset'), { method: 'POST' });
+    state.selectedId = null;
+    await fetchTickets();
+    toast('Reset complete.', '');
+  } catch (err) {
+    toast('Reset failed: ' + (err.message || err), 'error');
+  }
+});
+
+renderQueue();
+fetchTickets();
+</script>
+</body>
+</html>
