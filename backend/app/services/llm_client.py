@@ -20,12 +20,14 @@ pipeline for the other 99 tickets.
 import json
 import os
 import re
+import time
 from typing import Optional
 
 from groq import Groq
 from dotenv import load_dotenv
 
 _client: Optional[Groq] = None
+last_error: Optional[str] = None  # most recent LLM failure, shown by /llm-check
 
 # Load backend/.env when the app is started locally.  Deployment platforms
 # provide environment variables directly, which dotenv leaves untouched.
@@ -78,9 +80,11 @@ def complete_json(
     a stricter reminder if the response still doesn't parse."""
     # An API key, quota, or transient network failure must not make the whole
     # ticket batch unusable.  Callers already provide safe local fallbacks.
+    global last_error
     try:
         client = get_client()
-    except Exception:
+    except Exception as exc:
+        last_error = f"{type(exc).__name__}: {exc}"
         return None
 
     for attempt in range(2):
@@ -90,17 +94,26 @@ def complete_json(
                 "\n\nYour previous response could not be parsed as JSON. "
                 "Respond with ONLY the JSON object - no prose, no code fence."
             )
-        try:
-            response = client.chat.completions.create(
-                model=model,
-                max_tokens=max_tokens,
-                response_format={"type": "json_object"},
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt},
-                ],
-            )
-        except Exception:
+        response = None
+        for call in range(2):  # one extra try if we hit Groq's rate limit
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    max_tokens=max_tokens,
+                    response_format={"type": "json_object"},
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+                break
+            except Exception as exc:
+                last_error = f"{type(exc).__name__}: {exc}"
+                if "429" in str(exc) and call == 0:
+                    time.sleep(3)
+                    continue
+                return None
+        if response is None:
             return None
         text = response.choices[0].message.content or ""
         parsed = _extract_json(text)

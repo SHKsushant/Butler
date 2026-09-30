@@ -80,11 +80,33 @@ async def upload_tickets(file: UploadFile = File(...), db: Session = Depends(get
     return {"ingested": len(tickets)}
 
 
+@app.get("/llm-check")
+def llm_check():
+    """Diagnostic: makes one tiny Groq call and reports exactly why AI fails."""
+    from app.services import llm_client
+    has_key = bool(os.environ.get("GROQ_API_KEY"))
+    result = llm_client.complete_json(
+        'Reply with only this JSON: {"ok": true}', "ping",
+        model=llm_client.CLASSIFY_MODEL, max_tokens=20,
+    )
+    return {
+        "groq_key_present": has_key,
+        "llm_working": result is not None,
+        "last_error": llm_client.last_error,
+    }
+
+
 @app.post("/pipeline/run", response_model=PipelineStatus)
 def run_pipeline(db: Session = Depends(get_db)):
     """Runs the full pipeline over every ticket currently in "new" status.
     Safe to call repeatedly - already-processed tickets are left alone."""
-    tickets: List[Ticket] = db.query(Ticket).filter(Ticket.status == "new").all()
+    # Process a limited batch per call so a single request stays inside the
+    # serverless time limit and Groq's free-tier rate limit. Just click
+    # "Run triage pipeline" again until it reports nothing left to process.
+    batch = int(os.environ.get("PIPELINE_BATCH", "20"))
+    tickets: List[Ticket] = (
+        db.query(Ticket).filter(Ticket.status == "new").order_by(Ticket.id).limit(batch).all()
+    )
     total = len(tickets)
 
     if total == 0:
