@@ -33,8 +33,12 @@ last_error: Optional[str] = None  # most recent LLM failure, shown by /llm-check
 # provide environment variables directly, which dotenv leaves untouched.
 load_dotenv()
 
-CLASSIFY_MODEL = "llama-3.1-8b-instant"
-DRAFT_MODEL = "llama-3.3-70b-versatile"
+# Groq retired llama-3.1-8b-instant and llama-3.3-70b-versatile on the free
+# tier (2026-08-16). These are Groq's recommended replacements. Override with
+# the CLASSIFY_MODEL / DRAFT_MODEL environment variables if Groq changes again -
+# no code change needed.
+CLASSIFY_MODEL = os.environ.get("CLASSIFY_MODEL", "openai/gpt-oss-20b")
+DRAFT_MODEL = os.environ.get("DRAFT_MODEL", "openai/gpt-oss-120b")
 
 
 def get_client() -> Groq:
@@ -95,22 +99,29 @@ def complete_json(
                 "Respond with ONLY the JSON object - no prose, no code fence."
             )
         response = None
-        for call in range(2):  # one extra try if we hit Groq's rate limit
+        is_reasoning = model.startswith("openai/gpt-oss")
+        kwargs = {}
+        if is_reasoning:
+            # gpt-oss "thinks" before answering and thinking tokens count toward
+            # the limit, so keep effort low and leave plenty of room.
+            kwargs["extra_body"] = {"reasoning_effort": "low"}
+        for call in range(3):  # retries only for Groq rate limits (HTTP 429)
             try:
                 response = client.chat.completions.create(
                     model=model,
-                    max_tokens=max_tokens,
+                    max_tokens=max(max_tokens, 1200) if is_reasoning else max_tokens,
                     response_format={"type": "json_object"},
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt},
                     ],
+                    **kwargs,
                 )
                 break
             except Exception as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
-                if "429" in str(exc) and call == 0:
-                    time.sleep(3)
+                if "429" in str(exc) and call < 2:
+                    time.sleep(6)
                     continue
                 return None
         if response is None:

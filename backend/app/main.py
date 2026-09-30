@@ -82,18 +82,17 @@ async def upload_tickets(file: UploadFile = File(...), db: Session = Depends(get
 
 @app.get("/llm-check")
 def llm_check():
-    """Diagnostic: makes one tiny Groq call and reports exactly why AI fails."""
+    """Diagnostic: makes one tiny Groq call per model and reports why AI fails."""
     from app.services import llm_client
-    has_key = bool(os.environ.get("GROQ_API_KEY"))
-    result = llm_client.complete_json(
-        'Reply with only this JSON: {"ok": true}', "ping",
-        model=llm_client.CLASSIFY_MODEL, max_tokens=20,
-    )
-    return {
-        "groq_key_present": has_key,
-        "llm_working": result is not None,
-        "last_error": llm_client.last_error,
-    }
+    out = {"groq_key_present": bool(os.environ.get("GROQ_API_KEY")), "models": {}}
+    for name, model in (("classify", llm_client.CLASSIFY_MODEL), ("draft", llm_client.DRAFT_MODEL)):
+        llm_client.last_error = None
+        res = llm_client.complete_json(
+            'Reply with only this JSON: {"ok": true}', "ping", model=model, max_tokens=50,
+        )
+        out["models"][name] = {"model": model, "working": res is not None, "error": llm_client.last_error}
+    out["llm_working"] = all(v["working"] for v in out["models"].values())
+    return out
 
 
 @app.post("/pipeline/run", response_model=PipelineStatus)
@@ -103,7 +102,7 @@ def run_pipeline(db: Session = Depends(get_db)):
     # Process a limited batch per call so a single request stays inside the
     # serverless time limit and Groq's free-tier rate limit. Just click
     # "Run triage pipeline" again until it reports nothing left to process.
-    batch = int(os.environ.get("PIPELINE_BATCH", "20"))
+    batch = int(os.environ.get("PIPELINE_BATCH", "5"))
     tickets: List[Ticket] = (
         db.query(Ticket).filter(Ticket.status == "new").order_by(Ticket.id).limit(batch).all()
     )
@@ -115,11 +114,26 @@ def run_pipeline(db: Session = Depends(get_db)):
             prioritized=0, drafted=0, done=True,
         )
 
+    from app.services import llm_client
+
     classified = 0
+    ok_tickets = []
     for ticket in tickets:
-        classify_ticket(ticket)
-        classified += 1
+        result = classify_ticket(ticket)
+        if result.get("confidence", 0) > 0:
+            ok_tickets.append(ticket)
+            classified += 1
+        # A failed AI call leaves the ticket as "new" so the next click retries
+        # it, instead of saving a useless "other / neutral" placeholder.
     db.commit()
+
+    if not ok_tickets:
+        raise HTTPException(
+            status_code=503,
+            detail=f"AI unavailable or rate-limited - wait a minute and click again. ({llm_client.last_error})",
+        )
+    tickets = ok_tickets
+    total = len(tickets)
 
     embedded = 0
     for ticket in tickets:
